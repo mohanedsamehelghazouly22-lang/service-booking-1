@@ -1,0 +1,22 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../core/theme.dart';
+import '../../models/models.dart';
+import '../../repositories/app_repository.dart';
+
+class BookingFlow extends StatefulWidget {
+  const BookingFlow({super.key, required this.repository, required this.service});
+  final AppRepository repository; final ServiceItem service;
+  @override State<BookingFlow> createState() => _BookingFlowState();
+}
+class _BookingFlowState extends State<BookingFlow> {
+  int step = 0; List<LocationItem> locations = []; List<SlotItem> slots = []; LocationItem? location; SlotItem? slot; DateTime date = DateTime.now(); bool loading = false; String? error;
+  @override void initState() { super.initState(); _loadLocations(); }
+  Future<void> _loadLocations() async { setState(() => loading = true); try { locations = await widget.repository.locations(widget.service.id); } catch (e) { error = e.toString(); } finally { if (mounted) setState(() => loading = false); } }
+  Future<void> _loadSlots() async { if (location == null) return; setState(() => loading = true); try { slots = await widget.repository.slots(serviceId: widget.service.id, locationId: location!.id, date: DateFormat('yyyy-MM-dd').format(date)); } catch (e) { error = e.toString(); } finally { if (mounted) setState(() => loading = false); } }
+  Future<void> _book() async { if (location == null || slot == null) return; setState(() => loading = true); try { final r = await widget.repository.createBooking({'service_id': widget.service.id, 'location_id': location!.id, 'slot_id': slot!.id}); if (mounted) showDialog(context: context, builder: (_) => AlertDialog(title: const Text('Booking created'), content: Text('Status: ${r['booking']['status']}'), actions: [TextButton(onPressed: () => Navigator.popUntil(context, (r) => r.isFirst), child: const Text('Done'))])); } catch (e) { setState(() => error = e.toString()); } finally { if (mounted) setState(() => loading = false); } }
+  @override Widget build(BuildContext context) => Scaffold(backgroundColor: AppColors.peach, appBar: AppBar(backgroundColor: Colors.transparent, foregroundColor: AppColors.ink, title: Text(widget.service.name, style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w900))), body: Padding(padding: const EdgeInsets.all(20), child: Column(children: [LinearProgressIndicator(value: (step + 1) / 3, backgroundColor: Colors.black12, color: AppColors.orange), const SizedBox(height: 24), Expanded(child: step == 0 ? _location() : step == 1 ? _date() : _slot()), if (error != null) Text(error!, style: const TextStyle(color: Colors.red)), const SizedBox(height: 12), ElevatedButton(onPressed: loading ? null : () { if (step == 0 && location != null) { step = 1; setState(() {}); } else if (step == 1) { _loadSlots(); step = 2; setState(() {}); } else if (step == 2 && slot != null) _book(); }, child: Text(step == 2 ? 'Confirm booking' : 'Continue'))]));
+  Widget _location() => ListView(children: [const Text('Choose location', style: TextStyle(color: AppColors.ink, fontSize: 30, fontWeight: FontWeight.w900)), const SizedBox(height: 16), if (loading) const Center(child: CircularProgressIndicator()) else ...locations.map((l) => Card(color: AppColors.ink, child: RadioListTile<LocationItem>(value: l, groupValue: location, onChanged: (v) => setState(() => location = v), title: Text(l.name), subtitle: Text('${l.city}, ${l.governorate}', style: const TextStyle(color: Colors.white60)))))]);
+  Widget _date() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Pick a date', style: TextStyle(color: AppColors.ink, fontSize: 30, fontWeight: FontWeight.w900)), const SizedBox(height: 20), CalendarDatePicker(initialDate: date, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 180)), onDateChanged: (v) => setState(() => date = v))]);
+  Widget _slot() => ListView(children: [Text(DateFormat('EEEE, d MMMM').format(date), style: const TextStyle(color: AppColors.ink, fontSize: 25, fontWeight: FontWeight.w900)), const SizedBox(height: 18), if (loading) const Center(child: CircularProgressIndicator()) else if (slots.isEmpty) const Text('No available slots for this date.', style: TextStyle(color: AppColors.ink)) else Wrap(spacing: 10, runSpacing: 10, children: slots.map((s) => ChoiceChip(label: Text(s.startsAt), selected: slot?.id == s.id, onSelected: s.available ? (_) => setState(() => slot = s) : null)).toList())]);
+}

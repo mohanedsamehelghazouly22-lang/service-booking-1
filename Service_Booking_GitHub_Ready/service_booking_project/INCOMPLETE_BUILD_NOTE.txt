@@ -1,0 +1,5 @@
+BUILD VERIFICATION NOTE
+
+The source project is prepared for GitHub. This execution environment does not have the Flutter SDK or Android SDK installed and has no external package-network access, so a real flutter analyze / flutter build apk command could not be executed here. Do not treat this archive as a verified release APK.
+
+The GitHub Actions workflow included in .github/workflows/flutter.yml performs the real CI build on GitHub Actions after the repository is uploaded.
